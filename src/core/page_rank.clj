@@ -1,95 +1,69 @@
 (ns core.page-rank)
 
-(defn count-weights-single [ngbs]
-  (into {} (map
-             (fn [title]
-               [title (/ 1 (count ngbs))])
-             ngbs)))
+(defn abs [n] (max n (- n)))
 
-(defn count-weights [func sites]
-  (map
-    (fn [[title adjacent]]
-      {:from title
-       :hrefs (set (func adjacent))})
-    sites))
+(defn euclidean-distance [li-a li-b]
+  (Math/sqrt (reduce
+               +
+               (map
+                 (fn [a b]
+                   (let [diff (- b a)] (* diff diff)))
+                 li-a
+                 li-b))))
 
-(defn flatten-weights [nested-weights]
-  (mapcat
-    (fn [mapping]
-      (let [{:keys [from hrefs]} mapping]
-        (map
-          (fn [[to change]]
-            {:from from
-             :to to
-             :change change})
-          hrefs)))
-    nested-weights))
+(defn manhattan-distance [li-a li-b]
+  (first (sort
+           (comp - compare) ; least of all items
+           (map
+             #(Math/abs (- %1 %2))
+             li-a
+             li-b))))
 
-(defn list-sites [site-map weights]
-  "produces site string list from links and site-map keys"
-  (zipmap
-    (concat
-      (keys site-map)
-      ((comp
-         (partial apply concat)
-         (partial map vec)
-         vals)
-       site-map))
-    weights))
+(defn weights-seq-iteration
+  ([relations weights zeros damping-factor-fn]
+   (damping-factor-fn
+     (reduce
+       (fn [result relation]
+         (let [{:keys [from to change]} relation]
+           (update result to #(+ % (* change (get weights from))))))
+       zeros
+       relations))))
 
-(defn merge-weights [wgts]
-  (reduce
-    #(merge-with + %1 %2)
+(defn apply-damping-factor-85
+  [mappings]
+  (into
     {}
     (map
-      #(into {} [%])
-      wgts)))
+      (fn [[k v]]
+        [k (+
+            (/
+             (- 1 0.85)
+             (count mappings))
+            (* 0.85 v))])
+      mappings)))
 
-(defn weights-iteration
-  ([flat-weights sites-apriori]
-   (weights-iteration flat-weights sites-apriori sites-apriori))
-  ([flat-weights sites-apriori initial-weights-value]
-   #_(println flat-weights sites-apriori)
-   (println sites-apriori)
-   #_(println initial-weights-value)
-   (reduce
-     (fn [result weight]
-       (let [{:keys [from to change]} weight]
-         #_(println from to change)
-         #_(println sites-apriori result)
-         #_(println (get sites-apriori from))
-         (update result to #(+ % (* change (get sites-apriori from))))))
-     #_(zipmap
-         (keys sites-apriori)
-         (repeat 0))
-     initial-weights-value
-     flat-weights))
-  )
+(defn produce-zeros [weights]
+  (into {} (zipmap
+             (keys weights)
+             (repeat 0))))
 
-(defn find-weights [sites init-weight-coll]
-  (let [flat-weights (flatten-weights
-                       (count-weights count-weights-single sites))
-        #_all-sites-prepended #_(zipmap
-                    (keys (list-sites sites init-weight-coll))
-                    (repeat 0))
-        #_all-sites #_(weights-iteration flat-weights sites-apriori)]
-    (println flat-weights)
-    (loop [sites-apriori
-           (weights-iteration
-             flat-weights
-             (list-sites sites init-weight-coll)
-             (zipmap
-               (keys (list-sites sites init-weight-coll))
-               (repeat 0)))
-           counter 0]
-      (let [sites-post-apriori (weights-iteration flat-weights sites-apriori)]
-        (println "counter:" counter)
-        (if
-          (or
-            (> counter 5000)
-            (= sites-apriori sites-post-apriori))
-          sites-apriori
-          (recur
-            sites-post-apriori
-            (inc counter)))))))
-
+(defn find-weights-seq [relations weights zeros df-fn distance-fn]
+  (let
+    [weights-next (weights-seq-iteration
+                    relations
+                    weights
+                    zeros
+                    df-fn)]
+    (if
+      (distance-fn
+        (vals weights)
+        (vals weights-next))
+      (list weights-next)
+      (lazy-seq (cons
+                  weights
+                  (find-weights-seq
+                    relations
+                    weights-next
+                    weights-next
+                    df-fn
+                    distance-fn))))))
