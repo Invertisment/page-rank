@@ -1,6 +1,7 @@
 (ns core.page-rank-spec
   (:require [speclj.core :refer :all]
-            [core.page-rank :as a]))
+            [core.page-rank :as a]
+            [core.metrics :as m]))
 
 (describe
     "should find distance"
@@ -8,7 +9,7 @@
               [in1 in2 out]
               (should=
                 out
-                (a/euclidean-distance in1 in2)))]
+                (m/euclidean-distance in1 in2)))]
       (list
         (it "[0] [1] -> 1"
             (distance=
@@ -211,12 +212,12 @@
             (find-weights=
               (fn [a b]
                 (identity
-                 (let [distance (a/euclidean-distance a b)]
+                 (let [distance (m/euclidean-distance a b)]
                    #_(println distance)
                    (> 0.1 distance))))
               45))
         (it "manhattan [0.001] -> 84"
             (find-weights=
               (fn [a b]
-                (> 0.001 (a/manhattan-distance a b)))
+                (> 0.001 (m/manhattan-distance a b)))
               84)))))
