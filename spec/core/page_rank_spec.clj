@@ -221,3 +221,55 @@
               (fn [a b]
                 (> 0.001 (m/manhattan-distance a b)))
               84)))))
+
+(describe
+    "converge results"
+    (letfn [(find-weights=
+              [convergence-fn expected-count]
+              (should=
+                expected-count
+                (last
+                  (a/find-weights-seq
+                    (list
+                      {:from "B" :to "C" :change 1/2}
+                      {:from "B" :to "A" :change 1/2}
+                      {:from "C" :to "A" :change 1}
+                      {:from "D" :to "A" :change 1/3}
+                      {:from "D" :to "B" :change 1/3}
+                      {:from "D" :to "C" :change 1/3})
+                    {"A" 0.25
+                     "B" 0.25
+                     "C" 0.25
+                     "D" 0.25}
+                    {"A" 0
+                     "B" 0
+                     "C" 0
+                     "D" 0}
+                    a/apply-damping-factor-85
+                    convergence-fn))))]
+      (let
+        [expected-result {"A" 18.449968692302765
+                          "B" 0.7222132226896515
+                          "C" 2.7683044714541585
+                          "D" 0.24999970546984315}]
+        (list
+          (it "="
+              (find-weights=
+                (fn [a b]
+                  (= a b))
+                {"A" 18.45679012345676
+                 "B" 0.7222222222222212
+                 "C" 2.768518518518516
+                 "D" 0.24999999999999992}))
+          (it "manhattan [0.001]"
+              (find-weights=
+                (fn [a b]
+                  (> 0.001 (m/manhattan-distance a b)))
+                expected-result))
+          (it "euclidean [0.001]"
+              (find-weights=
+                (fn [a b]
+                  (> 0.001 (m/euclidean-distance a b)))
+                expected-result))))))
+
+
